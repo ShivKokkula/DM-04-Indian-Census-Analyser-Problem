@@ -1,5 +1,6 @@
 package censusanalyser;
 
+import com.google.gson.Gson;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 
@@ -7,6 +8,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.StreamSupport;
@@ -51,4 +53,35 @@ public class CensusAnalyser {
         return numOfEnteries;
     }
 
+    public String getStateWiseSortedCensusData(String csvFilePath) throws CensusAnalyserException {
+        try (Reader reader = Files.newBufferedReader(Paths.get(csvFilePath));) {
+            ICSVBuilder csvBuilder = CSVBuilderFactory.createCSVBuilder();
+            List<StateCensusCSV> censusCSVList = csvBuilder.getCSVFileList(reader,StateCensusCSV.class);
+            Comparator<StateCensusCSV> censusCSVComparator = Comparator.comparing(census -> census.state);
+            this.sort(censusCSVList,censusCSVComparator);
+            String sortedStateCensusJson = new Gson().toJson(censusCSVList);
+            return sortedStateCensusJson;
+        } catch (IOException e) {
+            throw new CensusAnalyserException(e.getMessage(),
+                    CensusAnalyserException.ExceptionType.CENSUS_FILE_PROBLEM);
+        } catch (RuntimeException e) {
+            throw new CensusAnalyserException(e.getMessage(),
+                    CensusAnalyserException.ExceptionType.INCORRECT_FILE_TYPE);
+        } catch (CSVBuilderException e) {
+            throw new CensusAnalyserException(e.getMessage(),e.type.name());
+        }
+    }
+
+    private void sort(List<StateCensusCSV> censusCSVList,Comparator<StateCensusCSV> censusCSVComparator) {
+        for (int i=0; i < censusCSVList.size()-1; i++){
+            for (int j=0; j < censusCSVList.size()-i-1; j++){
+                StateCensusCSV census1 = censusCSVList.get(j);
+                StateCensusCSV census2 = censusCSVList.get(j+1);
+                if (censusCSVComparator.compare(census1,census2) > 0){
+                    censusCSVList.set(j,census2);
+                    censusCSVList.set(j+1,census1);
+                }
+            }
+        }
+    }
 }
